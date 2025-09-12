@@ -7,7 +7,6 @@ $CVA_OS = "W11A"
 $CVA_filePath = Join-Path -Path $PSScriptRoot -ChildPath "CVA_info.txt"
 $infFileName_ADSP = "qcsubsys_ext_adsp$product_id.inf"
 $mbnFileName_ADSP = "qcadsp$product_id.mbn"
-$infFileName_GFX = "qcdx$product_id.inf"
 $infFileName_ABD = "qcabd$product_id.inf"
 $batFilePath = ".\ChangeAdspPermission1.cmd"
 $exeFilePath = ".\Version.exe"
@@ -34,9 +33,9 @@ $OS_ver = (Get-CimInstance -ClassName Win32_OperatingSystem).Version
 Write-Host ""
 Write-Host "==== System Information ===="
 Write-Host "BIOS: " -NoNewline
-Write-Host "$BIOS_ver" -ForegroundColor 'Green'
+Write-Host "$BIOS_ver" -ForegroundColor 'Blue'
 Write-Host "OS: " -NoNewline
-Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Green'
+Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Blue'
 Write-Host "============================"
 Write-Host ""
 
@@ -90,14 +89,14 @@ if ($infFileFound) {
     # Get the full path of the found file
     $infFileFullPath = $infFileFound.FullName
     Write-Host "INF file found at: " -NoNewline 
-    Write-Host "$infFileFullPath" -ForegroundColor 'Blue'
+    Write-Host "$infFileFullPath" -ForegroundColor 'White'
 }
 
 if ($mbnFileFound) {
     # Get the full path of the found file
     $mbnFileFullPath = $mbnFileFound.FullName
     Write-Host "MBN file found at: " -NoNewline 
-    Write-Host "$mbnFileFullPath" -ForegroundColor 'Blue'
+    Write-Host "$mbnFileFullPath" -ForegroundColor 'White'
 
     # Initialize OEM Build Version variable
     $oemBuildVer = $null
@@ -147,7 +146,7 @@ if ($mbnFileFound) {
         Write-Host "`n==== ADSP Information ===="
         if ($extensionId) {
             Write-Host "ExtensionId: " -NoNewline
-            Write-Host "$($extensionId.Matches.Groups[1].Value)" -ForegroundColor 'Green'
+            Write-Host "$($extensionId.Matches.Groups[1].Value)" -ForegroundColor 'Blue'
         } else {
             Write-Host "ExtensionId: " -NoNewline
             Write-Host "Not found" -ForegroundColor 'Red'
@@ -155,7 +154,7 @@ if ($mbnFileFound) {
 
         if ($driverVer) {
             Write-Host "DriverVer: " -NoNewline
-            Write-Host "$($driverVer.Matches.Groups[1].Value)" -ForegroundColor 'Green'
+            Write-Host "$($driverVer.Matches.Groups[1].Value)" -ForegroundColor 'Blue'
         } else {
             Write-Host "DriverVer: " -NoNewline
             Write-Host "Not found" -ForegroundColor 'Red'
@@ -164,13 +163,13 @@ if ($mbnFileFound) {
         # Display OEM Build Version
         if ($oemBuildVer) {
             Write-Host "OEM Build Ver: " -NoNewline
-            Write-Host "$oemBuildVer" -ForegroundColor 'Green'
+            Write-Host "$oemBuildVer" -ForegroundColor 'Blue'
         } else {
             Write-Host "OEM Build Ver: " -NoNewline
             Write-Host "Not found" -ForegroundColor 'Red'
         }
 
-        Write-Host "========================="
+        Write-Host "=========================="
 
     } catch {
         Write-Host "Error reading the INF file. You may need to run the ChangeAdspPermission1.cmd manually to grant permissions." -ForegroundColor 'Red'
@@ -218,10 +217,10 @@ if (Test-Path $exeFilePath) {
 		}
 
 		# Display the captured information header (BSP)
-		$BSP_sub = "`n==== BSP CVA Detail File Info ===="
+		$BSP_sub = "`n==== BSP CVA Information ===="
 		Write-Host $BSP_sub
 		Write-Host "File Version: " -NoNewline
-		Write-Host "$exeVersionString" -ForegroundColor 'Green'
+		Write-Host "$exeVersionString" -ForegroundColor 'Blue'
 
 		# Signature info (can be slow on some systems due to revocation checks)
 		try {
@@ -229,7 +228,7 @@ if (Test-Path $exeFilePath) {
 			if ($sig) {
 				$signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { "Unknown signer" }
 				Write-Host "Signature: " -NoNewline
-				Write-Host "$($sig.Status) - $signer" -ForegroundColor 'Green'
+				Write-Host "$($sig.Status) - $signer" -ForegroundColor 'Blue'
 			} else {
 				Write-Host "Signature: Not available" -ForegroundColor 'Yellow'
 			}
@@ -240,7 +239,7 @@ if (Test-Path $exeFilePath) {
 		# Display and persist the formatted line
 		$exe_info = "Version.exe=<DRIVERS>,$exeHexVersion,$CVA_OS"
 		Write-Host $exe_info -ForegroundColor 'Green'
-		Write-Host "========================="
+		Write-Host "============================="
 	        Write-Host ""
                 Write-Host ""
 
@@ -284,7 +283,7 @@ if ($infFileFullPath) {
         $driverVer = $fileContent | Select-String -Pattern 'DriverVer\s*=\s*(\d{2}\/\d{2}\/\d{4},[\w\d\.]+)'
 
         # Display the captured information
-		$WinPE_sub = "`n==== WinPE CVA Detail File Info ===="
+		$WinPE_sub = "`n==== WinPE CVA Information ===="
 		Write-Host $WinPE_sub
 		
 		# Load and write CVA_info.txt
@@ -307,7 +306,7 @@ if ($infFileFullPath) {
 		
         if ($driverVer) {
             Write-Host "DriverVer: " -NoNewline
-			Write-Host "$($driverVer.Matches.Groups[1].Value)" -ForegroundColor Green
+			Write-Host "$($driverVer.Matches.Groups[1].Value)" -ForegroundColor Blue
             
             # Parse version and convert to hex format
             $versionString = $driverVer.Matches.Groups[1].Value -replace '.*,'
@@ -338,7 +337,7 @@ if ($infFileFullPath) {
 			Write-Host "DriverVer: " -NoNewline
             Write-Host "Not found" -ForegroundColor 'Red'
         }
-        Write-Host "========================="
+        Write-Host "==============================="
 
     } catch {
         Write-Host "Error reading the INF file. You may need to run the ChangeAdspPermission1.cmd manually to grant permissions." -ForegroundColor 'Red'
