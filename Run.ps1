@@ -1,30 +1,191 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_changedate = 9/12/2025
+$_version = 1.0
+$_changedate = 11/06/2025
 
 
+# Set-ExecutionPolicy RemoteSigned
+
+$Configurations = @{
+    "CashmereQ" = @{
+        SensorList = @{
+            "iob" = "iob"
+            "color" = "tcs3530"
+            "ambient_light" = "tcs3530"
+            "st_wkmp" = "lsm6dso16is"
+            "st_intransport" = "lsm6dso16is"
+            "st_pickup" = "lsm6dso16is"
+            "st_otd" = "lsm6dso16is"
+            "st_oob" = "lsm6dso16is"
+            "st_ib" = "lsm6dso16is"
+            "sensor_temperature" = "lsm6dso16is"
+            "gyro" = "lsm6dso16is"
+            "accel" = "lsm6dso16is"
+        }
+    }
+    "Dolcelatte" = @{
+        SensorList = @{
+            "human_presence_detect" = "human_presence_detect"
+        }
+    }
+    # Add more configurations here in the future, for example:
+    # "NewConfig" = @{
+    #     SensorList = @{
+    #         "sensor1" = "expected_value1"
+    #         "sensor2" = "expected_value2"
+    #     }
+    # }
+}
+
+function Show-ConfigurationMenu {
+    Write-Host ""
+    Write-Host "=================="
+    
+    $configNames = $Configurations.Keys | Sort-Object
+    $index = 1
+    foreach ($configName in $configNames) {
+        Write-Host " [$index] $configName" 
+        $index++
+    }
+    Write-Host "==================" 
+    Write-Host ""
+
+    
+    do {
+        $selection = Read-Host "Select a SUT"
+        try {
+            $choiceIndex = [int]$selection - 1
+            if ($choiceIndex -ge 0 -and $choiceIndex -lt $configNames.Count) {
+                $selectedConfigName = $configNames[$choiceIndex]
+                return $selectedConfigName
+            } else {
+                continue
+            }
+        } catch {
+            continue
+        }
+    } while ($true)
+}
+
+# Let user select configuration
+$selectedConfigName = Show-ConfigurationMenu
+$selectedConfig = $Configurations[$selectedConfigName]
+$sensorList = $selectedConfig.SensorList
+
+# ============================================================================
+# Common Settings (can be customized per configuration if needed)
+# ============================================================================
 $product_id = "8480"
 $CVA_OS = "W11A"
 $CVA_filePath = Join-Path -Path $PSScriptRoot -ChildPath "CVA_info.txt"
 $infFileName_ADSP = "qcsubsys_ext_adsp$product_id.inf"
 $mbnFileName_ADSP = "qcadsp$product_id.mbn"
 $infFileName_ABD = "qcabd$product_id.inf"
-$batFilePath = ".\ChangeAdspPermission1.cmd"
 $exeFilePath = ".\Version.exe"
-$sensorList = @{
-    "iob" = "iob"
-    "color" = "tcs3530"
-    "ambient_light" = "tcs3530"
-    "st_wkmp" = "lsm6dso16is"
-    "st_intransport" = "lsm6dso16is"
-    "st_pickup" = "lsm6dso16is"
-    "st_otd" = "lsm6dso16is"
-    "st_oob" = "lsm6dso16is"
-    "st_ib" = "lsm6dso16is"
-    "sensor_temperature" = "lsm6dso16is"
-    "gyro" = "lsm6dso16is"
-    "accel" = "lsm6dso16is"
+$OpenAdspFolders = $false
+
+# Display selected configuration
+Write-Host "Running with config: " -NoNewline
+Write-Host "$selectedConfigName" -ForegroundColor Yellow
+Write-Host ""
+
+# ============================================================================
+# Common Functions
+# ============================================================================
+
+# Func to safely read current file content 
+function Get-SafeFileContent {
+    param($FilePath)
+    if (Test-Path $FilePath) {
+        try {
+            $content = Get-Content $FilePath -Raw
+            return if ($content) { $content } else { "" }
+        } catch {
+            return ""
+        }
+    }
+    return ""
 }
 
+# Func to safely write file content 
+function Add-ContentSafely {
+    param($FilePath, $Content, $Description = "")
+    
+    try {
+        $Content | Add-Content -Path $FilePath -Encoding UTF8
+    } catch {
+        if ($Description) {
+            Write-Host "Write fail $Description : $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+}
+
+# Func to check specific title in the file content
+function Test-SectionExists {
+    param($FilePath, $SectionTitle)
+    
+    if (-not (Test-Path $FilePath)) {
+        return $false
+    }
+    
+    try {
+        $result = Select-String -Path $FilePath -Pattern [regex]::Escape($SectionTitle) -SimpleMatch
+        return $null -ne $result
+    } catch {
+        $content = Get-Content $FilePath -Raw -ErrorAction SilentlyContinue
+        if ($content) {
+            return $content -like "*$SectionTitle*"
+        }
+        return $false
+    }
+}
+
+# Check if the file is empty or only has null strings
+function Test-FileIsEmpty {
+    param($FilePath)
+    
+    if (-not (Test-Path $FilePath)) { return $true }
+    try {
+        $item = Get-Item -Path $FilePath -ErrorAction Stop
+        if ($item.Length -gt 0) { return $false }
+        $hit = Select-String -Path $FilePath -Pattern '\\S' -ErrorAction SilentlyContinue
+        return $null -eq $hit
+    } catch {
+        return $true
+    }
+}
+
+# Inlined replacement for ChangeAdspPermission1/2.cmd
+function Invoke-ChangeAdspPermission {
+    param([bool]$OpenFolders = $false)
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        Write-Host "Admin rights required for permission changes. Please run PowerShell as Administrator." -ForegroundColor Yellow
+        return
+    }
+
+    $targetRoot = 'C:\Windows\System32\DriverStore\FileRepository'
+    try {
+        $dirs = Get-ChildItem -Path $targetRoot -Directory -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match 'qcsubsys_ext_adsp' }
+    } catch {
+        $dirs = @()
+    }
+
+    foreach ($dir in $dirs) {
+        try {
+            & takeown /F $dir.FullName /R /A | Out-Null
+            # Use icacls (cacls is deprecated)
+            & icacls $dir.FullName /T /grant Everyone:F /C | Out-Null
+            if ($OpenFolders) { Start-Process explorer.exe $dir.FullName }
+        } catch {
+            Write-Host "Failed to update permission on $($dir.FullName): $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+}
+
+# ============================================================================
+# Main Execution
+# ============================================================================
 
 # Display system info
 $BIOS_ver = (Get-CimInstance -ClassName Win32_BIOS).Name
@@ -33,9 +194,9 @@ $OS_ver = (Get-CimInstance -ClassName Win32_OperatingSystem).Version
 Write-Host ""
 Write-Host "==== System Information ===="
 Write-Host "BIOS: " -NoNewline
-Write-Host "$BIOS_ver" -ForegroundColor 'Blue'
+Write-Host "$BIOS_ver" -ForegroundColor 'Green'
 Write-Host "OS: " -NoNewline
-Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Blue'
+Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Green'
 Write-Host "============================"
 Write-Host ""
 
@@ -51,7 +212,6 @@ try {
     Write-Host "Failed to open Camera！" -ForegroundColor Red
     Write-Host "Error：" -ForegroundColor Yellow
     Write-Host $_.Exception.Message -ForegroundColor Red
-
 }
 
 
@@ -79,11 +239,11 @@ Write-Host $show_YB -ForegroundColor 'Yellow'
 
 
 # Check installed ADSP folder
-Write-Host "Changing ADSP permission and opening the directory..."
-& $batFilePath > $null 2>&1
+Write-Host "Changing ADSP permission..."
+Invoke-ChangeAdspPermission -OpenFolders:$OpenAdspFolders
 
-$infFileFound = Get-ChildItem -Path C:\Windows\System32\DriverStore\FileRepository -Filter $infFileName_ADSP -Recurse -ErrorAction SilentlyContinue
-$mbnFileFound = Get-ChildItem -Path C:\Windows\System32\DriverStore\FileRepository -Filter $mbnFileName_ADSP -Recurse -ErrorAction SilentlyContinue
+$infFileFound = Get-ChildItem -Path C:\Windows\System32\DriverStore\FileRepository -Filter $infFileName_ADSP -Recurse
+$mbnFileFound = Get-ChildItem -Path C:\Windows\System32\DriverStore\FileRepository -Filter $mbnFileName_ADSP -Recurse
 
 if ($infFileFound) {
     # Get the full path of the found file
@@ -137,7 +297,7 @@ if ($mbnFileFound) {
     # Display ADSP Information
     try {
         # Read the file content and use Select-String to find the required strings
-        $fileContent = Get-Content -Path $infFileFullPath -ErrorAction SilentlyContinue
+        $fileContent = Get-Content -Path $infFileFullPath
 
         $extensionId = $fileContent | Select-String -Pattern 'ExtensionId\s*=\s*({[^}]+})'
         $driverVer = $fileContent | Select-String -Pattern 'DriverVer\s*=\s*(\d{2}\/\d{2}\/\d{4},[\w\d\.]+)'
@@ -180,7 +340,6 @@ if ($mbnFileFound) {
     Write-Host "Error: The MBN file '$mbnFileName_ADSP' was not found in the DriverStore." -ForegroundColor 'Red'
 }
 
-
 Write-Host ""
 Write-Host ""
 
@@ -189,12 +348,10 @@ if (-not (Test-Path $CVA_filePath)) {
     New-Item -Path $CVA_filePath -ItemType File -Force | Out-Null
 }
 
-
-
 # Check Version.exe info
 if (Test-Path $exeFilePath) {
 	try {
-		$exeItem = Get-Item $exeFilePath -ErrorAction SilentlyContinue
+		$exeItem = Get-Item $exeFilePath
 		# More robust version retrieval
 		$exeVersionString = $null
 		try {
@@ -224,11 +381,13 @@ if (Test-Path $exeFilePath) {
 
 		# Signature info (can be slow on some systems due to revocation checks)
 		try {
-			$sig = Get-AuthenticodeSignature -FilePath $exeFilePath -ErrorAction SilentlyContinue
+			$sig = Get-AuthenticodeSignature -FilePath $exeFilePath
 			if ($sig) {
 				$signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { "Unknown signer" }
+				$status = $sig.Status
+                                $color = if ($status -eq 'Valid') { 'Blue' } else { 'Red' }
 				Write-Host "Signature: " -NoNewline
-				Write-Host "$($sig.Status) - $signer" -ForegroundColor 'Blue'
+				Write-Host "$status - $signer" -BackgroundColor $color
 			} else {
 				Write-Host "Signature: Not available" -ForegroundColor 'Yellow'
 			}
@@ -243,20 +402,11 @@ if (Test-Path $exeFilePath) {
 	        Write-Host ""
                 Write-Host ""
 
-		# Load existing CVA_info.txt content
-		$existingContent = ""
-		if (Test-Path $CVA_filePath) {
-			try { $existingContent = Get-Content $CVA_filePath -ErrorAction SilentlyContinue -Raw } catch { $existingContent = "" }
-		}
-
-		# Append header if not present
-		if ($existingContent -notmatch [regex]::Escape($BSP_sub)) {
-			try { $BSP_sub | Add-Content -Path $CVA_filePath -ErrorAction SilentlyContinue } catch { Write-Host "Warning: Could not write BSP header to CVA file" -ForegroundColor Yellow }
-		}
-
-		# Append info line if not present
-		if ($existingContent -notmatch [regex]::Escape($exe_info)) {
-			try { $exe_info | Add-Content -Path $CVA_filePath -ErrorAction SilentlyContinue } catch { Write-Host "Warning: Could not write Version.exe info to CVA file" -ForegroundColor Yellow }
+		# Check if CVA_info.txt has specific string
+		$hasBSPInfo = Test-SectionExists $CVA_filePath "BSP CVA Information"
+		if (-not $hasBSPInfo) {
+			Add-ContentSafely $CVA_filePath $BSP_sub "BSP Header"
+			Add-ContentSafely $CVA_filePath $exe_info "Version.exe Info"
 		}
 
 	} catch {
@@ -268,45 +418,27 @@ if (Test-Path $exeFilePath) {
 
 # Check installed ABD folder path
 $repo = 'C:\Windows\System32\DriverStore\FileRepository'
-$abdDir = Get-ChildItem $repo -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "qcabd$product_id.inf_*" } | Select-Object -First 1
+$abdDir = Get-ChildItem $repo -Directory | Where-Object { $_.Name -like "qcabd$product_id.inf_*" } | Select-Object -First 1
 if ($abdDir) {
 	$infFileFullPath = Join-Path $abdDir.FullName "qcabd$product_id.inf"
 } else {
 	# Fallback to original recursive search
-	$infFileFound = Get-ChildItem -Path $repo -Filter $infFileName_ABD -Recurse -ErrorAction SilentlyContinue
+	$infFileFound = Get-ChildItem -Path $repo -Filter $infFileName_ABD -Recurse
 	if ($infFileFound) { $infFileFullPath = $infFileFound.FullName }
 }
 if ($infFileFullPath) {
 	try {
         # Read the file content and use Select-String to find the required strings
-        $fileContent = Get-Content -Path $infFileFullPath -ErrorAction SilentlyContinue
+        $fileContent = Get-Content -Path $infFileFullPath
         $driverVer = $fileContent | Select-String -Pattern 'DriverVer\s*=\s*(\d{2}\/\d{2}\/\d{4},[\w\d\.]+)'
 
         # Display the captured information
 		$WinPE_sub = "`n==== WinPE CVA Information ===="
 		Write-Host $WinPE_sub
 		
-		# Load and write CVA_info.txt
-        $existingContent = ""
-        if (Test-Path $CVA_filePath) {
-            try {
-                $existingContent = Get-Content $CVA_filePath -ErrorAction SilentlyContinue -Raw
-            } catch {
-                $existingContent = ""
-            }
-        }
-        
-		if ($existingContent -notmatch [regex]::Escape($WinPE_sub)) {
-			try {
-                $WinPE_sub | Add-Content -Path $CVA_filePath -ErrorAction SilentlyContinue
-            } catch {
-                Write-Host "Warning: Could not write to CVA file" -ForegroundColor Yellow
-            }
-		}
-		
         if ($driverVer) {
             Write-Host "DriverVer: " -NoNewline
-			Write-Host "$($driverVer.Matches.Groups[1].Value)" -ForegroundColor Blue
+			Write-Host "$($driverVer.Matches.Groups[1].Value)"
             
             # Parse version and convert to hex format
             $versionString = $driverVer.Matches.Groups[1].Value -replace '.*,'
@@ -324,14 +456,11 @@ if ($infFileFullPath) {
 			$WinPE_info = "qcabd$product_id.sys=<WINSYSDIR>\DriverStore\FileRepository\$directoryName,$hexVersion,$CVA_OS" 
             Write-Host $WinPE_info -ForegroundColor 'Green'
 			
-			# Load and write CVA_info.txt
-            if ($existingContent -notmatch [regex]::Escape($WinPE_info)) {
-                try {
-                    $WinPE_info | Add-Content -Path $CVA_filePath -ErrorAction SilentlyContinue
-                } catch {
-                    Write-Host "Warning: Could not write WinPE info to CVA file" -ForegroundColor Yellow
-                }
-            }
+			$hasWinPEInfo = Test-SectionExists $CVA_filePath "WinPE CVA Information"
+			if (-not $hasWinPEInfo) {
+				Add-ContentSafely $CVA_filePath $WinPE_sub "WinPE Header"
+				Add-ContentSafely $CVA_filePath $WinPE_info "WinPE Info"
+			}
 			
         } else {
 			Write-Host "DriverVer: " -NoNewline
@@ -350,6 +479,7 @@ if ($infFileFullPath) {
 Write-Host ""
 Write-Host ""
 pause
+
 
 # Init counter for summary
 $totalSensors = $sensorList.Count
@@ -413,6 +543,7 @@ foreach ($sensorName in $sensorList.Keys) {
 Write-Host "=================================" 
 Write-Host "           SUMMARY" 
 Write-Host "=================================" 
+Write-Host "Configuration: $selectedConfigName"
 Write-Host "Total sensors checked: $totalSensors" 
 Write-Host "NAME matched: $nameMatchCount"
 Write-Host "NAME mismatched: $nameMismatchCount" 
@@ -431,3 +562,4 @@ Write-Host ""
 Write-Host ""
 Write-Host ""
 pause
+
