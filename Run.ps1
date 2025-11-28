@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
 $_version = 1.0
-$_changedate = 11/06/2025
+$_changedate = 11/28/2025
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -76,11 +76,11 @@ $sensorList = $selectedConfig.SensorList
 # ============================================================================
 $product_id = "8480"
 $CVA_OS = "W11A"
-$CVA_filePath = Join-Path -Path $PSScriptRoot -ChildPath "CVA_info.txt"
+$CVA_filePath = Join-Path -Path $PSScriptRoot -ChildPath "CVA_info_WinPE.txt"
 $infFileName_ADSP = "qcsubsys_ext_adsp$product_id.inf"
 $mbnFileName_ADSP = "qcadsp$product_id.mbn"
 $infFileName_ABD = "qcabd$product_id.inf"
-$exeFilePath = ".\Version.exe"
+# $exeFilePath = ".\Version.exe"
 $OpenAdspFolders = $false
 
 # Display selected configuration
@@ -349,72 +349,72 @@ if (-not (Test-Path $CVA_filePath)) {
 }
 
 # Check Version.exe info
-if (Test-Path $exeFilePath) {
-	try {
-		$exeItem = Get-Item $exeFilePath
-		# More robust version retrieval
-		$exeVersionString = $null
-		try {
-			$exeVersionString = $exeItem.VersionInfo.FileVersion
-		} catch {}
-		if (-not $exeVersionString) {
-			try {
-				$verInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $exeFilePath))
-				$exeVersionString = $verInfo.FileVersion
-			} catch {}
-		}
-
-		# Convert version to hex: extract numeric parts, pad to 4 with zeros
-		$exeHexVersion = "N/A"
-		if ($exeVersionString) {
-			$exeVersionParts = @([regex]::Matches($exeVersionString, '\d+')) | ForEach-Object { $_.Value }
-			while ($exeVersionParts.Count -lt 4) { $exeVersionParts += '0' }
-			$exeVersionParts = $exeVersionParts[0..3]
-			$exeHexVersion = "0x{0:X4},0x{1:X4},0x{2:X4},0x{3:X4}" -f [int]$exeVersionParts[0], [int]$exeVersionParts[1], [int]$exeVersionParts[2], [int]$exeVersionParts[3]
-		}
-
-		# Display the captured information header (BSP)
-		$BSP_sub = "`n==== BSP CVA Information ===="
-		Write-Host $BSP_sub
-		Write-Host "File Version: " -NoNewline
-		Write-Host "$exeVersionString" -ForegroundColor 'Blue'
-
-		# Signature info (can be slow on some systems due to revocation checks)
-		try {
-			$sig = Get-AuthenticodeSignature -FilePath $exeFilePath
-			if ($sig) {
-				$signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { "Unknown signer" }
-				$status = $sig.Status
-                                $color = if ($status -eq 'Valid') { 'Blue' } else { 'Red' }
-				Write-Host "Signature: " -NoNewline
-				Write-Host "$status - $signer" -BackgroundColor $color
-			} else {
-				Write-Host "Signature: Not available" -ForegroundColor 'Yellow'
-			}
-		} catch {
-			Write-Host "Signature: Skipped (error during signature check)" -ForegroundColor Yellow
-		}
-
-		# Display and persist the formatted line
-		$exe_info = "Version.exe=<DRIVERS>,$exeHexVersion,$CVA_OS"
-		Write-Host $exe_info -ForegroundColor 'Green'
-		Write-Host "============================="
-	        Write-Host ""
-                Write-Host ""
-
-		# Check if CVA_info.txt has specific string
-		$hasBSPInfo = Test-SectionExists $CVA_filePath "BSP CVA Information"
-		if (-not $hasBSPInfo) {
-			Add-ContentSafely $CVA_filePath $BSP_sub "BSP Header"
-			Add-ContentSafely $CVA_filePath $exe_info "Version.exe Info"
-		}
-
-	} catch {
-		Write-Host "Error: Failed to read Version.exe details." -ForegroundColor 'Red'
-	}
-} else {
-	Write-Host "Error: Version.exe not found in the current directory" -ForegroundColor 'Red'
-}
+#	if (Test-Path $exeFilePath) {
+#		try {
+#			$exeItem = Get-Item $exeFilePath
+#			# More robust version retrieval
+#			$exeVersionString = $null
+#			try {
+#				$exeVersionString = $exeItem.VersionInfo.FileVersion
+#			} catch {}
+#			if (-not $exeVersionString) {
+#				try {
+#					$verInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $exeFilePath))
+#					$exeVersionString = $verInfo.FileVersion
+#				} catch {}
+#			}
+#
+#			# Convert version to hex: extract numeric parts, pad to 4 with zeros
+#			$exeHexVersion = "N/A"
+#			if ($exeVersionString) {
+#				$exeVersionParts = @([regex]::Matches($exeVersionString, '\d+')) | ForEach-Object { $_.Value }
+#				while ($exeVersionParts.Count -lt 4) { $exeVersionParts += '0' }
+#				$exeVersionParts = $exeVersionParts[0..3]
+#				$exeHexVersion = "0x{0:X4},0x{1:X4},0x{2:X4},0x{3:X4}" -f [int]$exeVersionParts[0], [int]$exeVersionParts[1], [int]$exeVersionParts[2], [int]$exeVersionParts[3]
+#			}
+#
+#			# Display the captured information header (BSP)
+#			$BSP_sub = "`n==== BSP CVA Information ===="
+#			Write-Host $BSP_sub
+#			Write-Host "File Version: " -NoNewline
+#			Write-Host "$exeVersionString" -ForegroundColor 'Blue'
+#
+#			# Signature info (can be slow on some systems due to revocation checks)
+#			try {
+#				$sig = Get-AuthenticodeSignature -FilePath $exeFilePath
+#				if ($sig) {
+#					$signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { "Unknown signer" }
+#					$status = $sig.Status
+#									$color = if ($status -eq 'Valid') { 'Blue' } else { 'Red' }
+#					Write-Host "Signature: " -NoNewline
+#					Write-Host "$status - $signer" -BackgroundColor $color
+#				} else {
+#					Write-Host "Signature: Not available" -ForegroundColor 'Yellow'
+#				}
+#			} catch {
+#				Write-Host "Signature: Skipped (error during signature check)" -ForegroundColor Yellow
+#			}
+#
+#			# Display and persist the formatted line
+#			$exe_info = "Version.exe=<DRIVERS>,$exeHexVersion,$CVA_OS"
+#			Write-Host $exe_info -ForegroundColor 'Green'
+#			Write-Host "============================="
+#				Write-Host ""
+#					Write-Host ""
+#
+#			# Check if CVA_info.txt has specific string
+#			$hasBSPInfo = Test-SectionExists $CVA_filePath "BSP CVA Information"
+#			if (-not $hasBSPInfo) {
+#				Add-ContentSafely $CVA_filePath $BSP_sub "BSP Header"
+#				Add-ContentSafely $CVA_filePath $exe_info "Version.exe Info"
+#			}
+#
+#		} catch {
+#			Write-Host "Error: Failed to read Version.exe details." -ForegroundColor 'Red'
+#		}
+#	} else {
+#		Write-Host "Error: Version.exe not found in the current directory" -ForegroundColor 'Red'
+#	}
 
 # Check installed ABD folder path
 $repo = 'C:\Windows\System32\DriverStore\FileRepository'
