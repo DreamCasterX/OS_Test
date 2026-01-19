@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = 1.0
-$_changedate = 11/28/2025
+$_version = 1.1
+$_changedate = 01/19/2026
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -24,7 +24,7 @@ $Configurations = @{
     }
     "Dolcelatte" = @{
         SensorList = @{
-            "human_presence_detect" = "human_presence_detect"
+            #"human_presence_detect" = "human_presence_detect"
         }
     }
     # Add more configurations here in the future, for example:
@@ -481,85 +481,108 @@ Write-Host ""
 pause
 
 
-# Init counter for summary
-$totalSensors = $sensorList.Count
-$nameNotFoundCount = 0
-$nameMatchCount = 0
-$nameMismatchCount = 0
+# Only run sensor tool if sensorList is defined and not empty
+if ($sensorList -and $sensorList.Count -gt 0) {
 
+    # Init counter for summary
+    $totalSensors = $sensorList.Count
+    $nameNotFoundCount = 0
+    $nameMatchCount = 0
+    $nameMismatchCount = 0
 
-# Run sensor tool
-$sscFilePath = Join-Path -Path $PSScriptRoot -ChildPath "ssc_sensor_info.exe"
-if (-not (Test-Path $sscFilePath)) {
-    Write-Host "ERROR: ssc_sensor_info.exe not found！" -ForegroundColor Red
-    exit
-}
+    # Run sensor tool
+    $sscFilePath = Join-Path -Path $PSScriptRoot -ChildPath "ssc_sensor_info.exe"
+    if (-not (Test-Path $sscFilePath)) {
+        Write-Host "ERROR: ssc_sensor_info.exe not found！" -ForegroundColor Red
+        exit
+    }
 
-Write-Host ""
-Write-Host ""
-Write-Host "Running sensor tool..."
-foreach ($sensorName in $sensorList.Keys) {
-    Write-Host "Checking sensor: $sensorName" -ForegroundColor Cyan
-    Write-Host "------------------------------"
-    $output = & $sscFilePath -sensor="$sensorName" *>&1
-    $typeFound = $false
+    Write-Host ""
+    Write-Host ""
+    Write-Host "Running sensor tool..."
+    foreach ($sensorName in $sensorList.Keys) {
+        Write-Host "Checking sensor: $sensorName" -ForegroundColor Cyan
+        Write-Host "------------------------------"
+        $output = & $sscFilePath -sensor="$sensorName" *>&1
+        $typeFound = $false
 
-    $lines = $output -split "`n"
-    foreach ($line in $lines) {
-        if ($line.Trim().StartsWith("NAME ")) {
-            $nameValue = $line.Trim() -replace "^NAME\s*=\s*", ""
-            $nameValue = $nameValue.Trim()
-            
-            $expectedName = $sensorList[$sensorName]
-            
-            if ($expectedName -and $nameValue -eq $expectedName) {
-                Write-Host $line -ForegroundColor Green
-                $nameMatchCount++
-            } elseif ($expectedName) {
-                Write-Host $line -ForegroundColor Red
-                Write-Host "Expected: $expectedName, but found: $nameValue" -ForegroundColor Yellow
-                $nameMismatchCount++
+        $lines = $output -split "`n"
+        foreach ($line in $lines) {
+            if ($line.Trim().StartsWith("NAME ")) {
+                $nameValue = $line.Trim() -replace "^NAME\s*=\s*", ""
+                $nameValue = $nameValue.Trim()
+                
+                $expectedName = $sensorList[$sensorName]
+                
+                if ($expectedName -and $nameValue -eq $expectedName) {
+                    Write-Host $line -ForegroundColor Green
+                    $nameMatchCount++
+                } elseif ($expectedName) {
+                    Write-Host $line -ForegroundColor Red
+                    Write-Host "Expected: $expectedName, but found: $nameValue" -ForegroundColor Yellow
+                    $nameMismatchCount++
+                } else {
+                    Write-Host $line -ForegroundColor Yellow
+                    Write-Host "Warning: No expected value defined for sensor '$sensorName'" -ForegroundColor Yellow
+                    $nameMismatchCount++
+                }
+                $typeFound = $true
             } else {
-                Write-Host $line -ForegroundColor Yellow
-                Write-Host "Warning: No expected value defined for sensor '$sensorName'" -ForegroundColor Yellow
-                $nameMismatchCount++
+                Write-Host $line
             }
-            $typeFound = $true
-        } else {
-            Write-Host $line
         }
+        
+        if (-not $typeFound) {
+            Write-Host "NAME not found!" -ForegroundColor Red
+            $nameNotFoundCount++
+        }
+
+        Write-Host ""
+        Write-Host ""
     }
-    
-    if (-not $typeFound) {
-        Write-Host "NAME not found!" -ForegroundColor Red
-        $nameNotFoundCount++
+
+    # Display detailed summary
+    Write-Host "=================================" 
+    Write-Host "           SUMMARY" 
+    Write-Host "=================================" 
+    Write-Host "Configuration: $selectedConfigName"
+    Write-Host "Total sensors checked: $totalSensors" 
+    Write-Host "NAME matched: $nameMatchCount"
+    Write-Host "NAME mismatched: $nameMismatchCount" 
+    Write-Host "NAME not found: $nameNotFoundCount" 
+    Write-Host "---------------------------------" 
+
+    # Determine PASS/FAIL based on criteria
+    if ($nameNotFoundCount -eq 0) {
+        Write-Host "Result: PASSED" -ForegroundColor Green -BackgroundColor Black
+    } else {
+        Write-Host "Result: FAILED" -ForegroundColor Red -BackgroundColor Black
     }
 
+    Write-Host "---------------------------------" -ForegroundColor White
     Write-Host ""
-    Write-Host ""
-}
 
-# Display detailed summary
-Write-Host "=================================" 
-Write-Host "           SUMMARY" 
-Write-Host "=================================" 
-Write-Host "Configuration: $selectedConfigName"
-Write-Host "Total sensors checked: $totalSensors" 
-Write-Host "NAME matched: $nameMatchCount"
-Write-Host "NAME mismatched: $nameMismatchCount" 
-Write-Host "NAME not found: $nameNotFoundCount" 
-Write-Host "---------------------------------" 
-
-# Determine PASS/FAIL based on criteria
-if ($nameNotFoundCount -eq 0) {
-    Write-Host "Result: PASSED" -ForegroundColor Green -BackgroundColor Black
 } else {
-    Write-Host "Result: FAILED" -ForegroundColor Red -BackgroundColor Black
+    Write-Host ""
+    Write-Host "No sensors configured. Skipping sensor tool." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host ""
 }
+# Extra check for Himax LID service (only for CashmereQ)
+if ($selectedConfigName -eq "CashmereQ") {
+    Write-Host ""
+    Write-Host ""
+    Write-Host "Checking Himax LID Monitor service..."
 
-Write-Host "---------------------------------" -ForegroundColor White
-Write-Host ""
-Write-Host ""
-Write-Host ""
+    $exists = Get-Service -Name "HmxLaptopLidMonitor" -ErrorAction SilentlyContinue
+    if ($exists) {
+        Write-Host "Service exists" -ForegroundColor Green
+    } else {
+        Write-Host "Service does not exist" -ForegroundColor Red
+    }
+
+    Write-Host ""
+    Write-Host ""
+}
 pause
 
