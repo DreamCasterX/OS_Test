@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = 1.2
-$_changedate = 01/20/2026
+$_version = 1.3
+$_changedate = 02/06/2026
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -38,6 +38,9 @@ $Configurations = @{
 
 function Show-ConfigurationMenu {
     Write-Host ""
+    Write-Host "** OS Test " -NoNewline
+    Write-Host "v$_version" -ForegroundColor 'DarkYellow' -NoNewline
+    Write-Host " **"
     Write-Host "=================="
     
     $configNames = $Configurations.Keys | Sort-Object
@@ -65,6 +68,15 @@ function Show-ConfigurationMenu {
         }
     } while ($true)
 }
+
+# Check if run as admin
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Please run this script with administrator privileges " -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit..."
+    exit
+}
+
 
 # Let user select configuration
 $selectedConfigName = Show-ConfigurationMenu
@@ -186,15 +198,6 @@ function Invoke-ChangeAdspPermission {
 # ============================================================================
 # Main Execution
 # ============================================================================
-
-
-# Check if run as admin
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "Please run this script with administrator privileges " -ForegroundColor Yellow
-    Write-Host ""
-    Read-Host "Press Enter to exit..."
-    exit
-}
 
 
 # Display system info
