@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = 1.1
-$_changedate = 01/19/2026
+$_version = 1.2
+$_changedate = 01/20/2026
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -186,6 +186,16 @@ function Invoke-ChangeAdspPermission {
 # ============================================================================
 # Main Execution
 # ============================================================================
+
+
+# Check if run as admin
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Please run this script with administrator privileges " -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit..."
+    exit
+}
+
 
 # Display system info
 $BIOS_ver = (Get-CimInstance -ClassName Win32_BIOS).Name
@@ -491,7 +501,8 @@ if ($sensorList -and $sensorList.Count -gt 0) {
     $nameMismatchCount = 0
 
     # Run sensor tool
-    $sscFilePath = Join-Path -Path $PSScriptRoot -ChildPath "ssc_sensor_info.exe"
+    $sscFilePath = Join-Path -Path $PSScriptRoot -ChildPath "bin" | Join-Path -ChildPath "ssc_sensor_info.exe"
+
     if (-not (Test-Path $sscFilePath)) {
         Write-Host "ERROR: ssc_sensor_info.exe not found！" -ForegroundColor Red
         exit
@@ -576,7 +587,8 @@ if ($selectedConfigName -eq "CashmereQ") {
 
     $exists = Get-Service -Name "HmxLaptopLidMonitor" -ErrorAction SilentlyContinue
     if ($exists) {
-        Write-Host "Service exists" -ForegroundColor Green
+	$status = $exists.Status
+	Write-Host "Service status: $status" -ForegroundColor Green
     } else {
         Write-Host "Service does not exist" -ForegroundColor Red
     }
