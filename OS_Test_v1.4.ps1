@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = 1.3
-$_changedate = 02/06/2026
+$_version = '1.4'
+$_changedate = 03/25/2026
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -195,6 +195,7 @@ function Invoke-ChangeAdspPermission {
     }
 }
 
+
 # ============================================================================
 # Main Execution
 # ============================================================================
@@ -250,6 +251,27 @@ $show_YB = $errorDevices |
     }} | Format-Table -AutoSize | Out-String
 Write-Host $show_YB -ForegroundColor 'Yellow'
 
+
+# Check error event ID 2
+Write-Host "Checking error event ID 2..."
+try {
+    $event = Get-WinEvent -FilterHashtable @{
+        LogName = 'System'
+        Id      = 2
+        Level   = 2   # Error
+    } -MaxEvents 1 -ErrorAction Stop
+
+    Write-Host "FAILED - Error event found:" -ForegroundColor Red
+    Write-Host "  TimeCreated: $($event.TimeCreated)" -ForegroundColor Red
+    Write-Host "  ID: $($event.Id)" -ForegroundColor Red
+    Write-Host "  Message: " -ForegroundColor Red
+    Write-Host "    $($event.Message)" -ForegroundColor Red
+    #$event | Select-Object TimeCreated, Id, Message | Format-List
+} catch {
+    Write-Host "PASSED"
+}
+Write-Host ""
+Write-Host ""
 
 # Check installed ADSP folder
 Write-Host "Changing ADSP permission..."
@@ -489,6 +511,7 @@ if ($infFileFullPath) {
 } else {
     Write-Host "Error: The INF file '$infFileName_ABD' was not found in the DriverStore." -ForegroundColor 'Red'
 }
+
 Write-Host ""
 Write-Host ""
 pause
