@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = '1.4'
-$_changedate = 03/25/2026
+$_version = '1.5'
+$_changedate = 05/05/2026
 
 
 # Set-ExecutionPolicy RemoteSigned
@@ -611,10 +611,46 @@ if ($selectedConfigName -eq "CashmereQ") {
     Write-Host ""
     Write-Host "Checking Himax LID Monitor service..."
 
+
+# Check event ID 7045 (Service Control Manager — service installed)
+try {
+    $himaxServiceDisplayName = 'Himax Laptop Lid Monitor Service'
+    $filter = @{
+        LogName      = 'System'
+        Id           = 7045
+        Level        = 4   # Information
+        ProviderName = 'Service Control Manager'
+    }
+    $himaxInstallEvent = Get-WinEvent -FilterHashtable $filter -MaxEvents 2000 -ErrorAction Stop |
+        Where-Object {
+            $_.Properties.Count -gt 0 -and
+            $_.Properties[0].Value -eq $himaxServiceDisplayName
+        } |
+        Select-Object -First 1
+
+    if (-not $himaxInstallEvent) {
+        throw 'No matching 7045 event for this service name'
+    }
+
+    Write-Host "Service was installed" -ForegroundColor Green
+    Write-Host "  TimeCreated: $($himaxInstallEvent.TimeCreated)" 
+    Write-Host "  ID: $($himaxInstallEvent.Id)" 
+    Write-Host "  Message: "
+    Write-Host "    $($himaxInstallEvent.Message)"
+} catch {
+    Write-Host "Service was not installed" -ForegroundColor Red
+}
+
+
     $exists = Get-Service -Name "HmxLaptopLidMonitor" -ErrorAction SilentlyContinue
     if ($exists) {
 	$status = $exists.Status
-	Write-Host "Service status: $status" -ForegroundColor Green
+        $statusColor = switch ($status) {
+            'Running' { 'Green' }    
+            'Stopped' { 'Red' } 
+             default  { 'Red' }
+        }
+   	Write-Host "Service status: $status" -ForegroundColor $statusColor
     } else {
         Write-Host "Service does not exist" -ForegroundColor Red
     }
