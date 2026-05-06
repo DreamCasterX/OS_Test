@@ -1,9 +1,9 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
 $_version = '1.5'
-$_changedate = 05/05/2026
+$_changedate = 05/06/2026
 
 
-# Set-ExecutionPolicy RemoteSigned
+# Set-ExecutionPolicy Bypass
 
 $Configurations = @{
     "CashmereQ" = @{
@@ -36,6 +36,33 @@ $Configurations = @{
     # }
 }
 
+
+# Self-elevate to admin
+$principal = New-Object Security.Principal.WindowsPrincipal(
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+)
+$scriptPath = if ($PSCommandPath) {
+    $PSCommandPath 
+} else { 
+    $MyInvocation.MyCommand.Path 
+}
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Start-Process PowerShell `
+        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
+        -Verb RunAs
+    exit
+}
+
+
+# Check if run as admin
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Please run this script with administrator privileges " -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit..."
+    exit
+}
+
+
 function Show-ConfigurationMenu {
     Write-Host ""
     Write-Host "** OS Test " -NoNewline
@@ -67,14 +94,6 @@ function Show-ConfigurationMenu {
             continue
         }
     } while ($true)
-}
-
-# Check if run as admin
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "Please run this script with administrator privileges " -ForegroundColor Yellow
-    Write-Host ""
-    Read-Host "Press Enter to exit..."
-    exit
 }
 
 
