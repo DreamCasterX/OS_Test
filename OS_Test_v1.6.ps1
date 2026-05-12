@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = '1.5'
-$_changedate = 05/06/2026
+$_version = '1.6'
+$_changedate = 05/12/2026
 
 
 # Set-ExecutionPolicy Bypass
@@ -288,6 +288,43 @@ try {
     #$event | Select-Object TimeCreated, Id, Message | Format-List
 } catch {
     Write-Host "PASSED"
+}
+Write-Host ""
+Write-Host ""
+
+# Check BSOD-related artifacts (DumpStack.log, MEMORY.DMP, Minidump)
+Write-Host "Checking memory or crash dump..."
+$dumpStackPath = 'C:\DumpStack.log'
+$memoryDmpPath = Join-Path $env:SystemRoot 'MEMORY.DMP'
+$miniDumpDir   = Join-Path $env:SystemRoot 'Minidump'
+$bsodFindings  = @()
+if (Test-Path -LiteralPath $dumpStackPath -PathType Leaf) {
+    $bsodFindings += "DumpStack.log found: $dumpStackPath"
+}
+if (Test-Path -LiteralPath $memoryDmpPath -PathType Leaf) {
+    try {
+        $dmpSize = (Get-Item -LiteralPath $memoryDmpPath).Length
+        $bsodFindings += "MEMORY.DMP found: $memoryDmpPath ($([math]::Round($dmpSize / 1GB, 2)) GB)"
+    } catch {
+        $bsodFindings += "MEMORY.DMP found: $memoryDmpPath"
+    }
+}
+if (Test-Path -LiteralPath $miniDumpDir -PathType Container) {
+    $miniDumps = @(Get-ChildItem -LiteralPath $miniDumpDir -Filter '*.dmp' -ErrorAction SilentlyContinue)
+    if ($miniDumps.Count -gt 0) {
+        $bsodFindings += "Minidump folder contains $($miniDumps.Count) .dmp file(s): $miniDumpDir"
+    }
+}
+if ($bsodFindings.Count -gt 0) {
+    Write-Host "FAILED -" -ForegroundColor Red
+    foreach ($line in $bsodFindings) {
+        Write-Host "  $line" -ForegroundColor Red
+    }
+} else {
+    Write-Host "PASSED"
+    if (Test-Path -LiteralPath $miniDumpDir -PathType Container) {
+        Write-Host "  (Note: $miniDumpDir exists but contains no .dmp files)" -ForegroundColor DarkGray
+    }
 }
 Write-Host ""
 Write-Host ""
