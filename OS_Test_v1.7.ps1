@@ -1,5 +1,5 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = '1.62'
+$_version = '1.7'
 $_changedate = 06/30/2026
 
 
@@ -229,9 +229,9 @@ $OS_ver = (Get-CimInstance -ClassName Win32_OperatingSystem).Version
 Write-Host ""
 Write-Host "==== System Information ===="
 Write-Host "BIOS: " -NoNewline
-Write-Host "$BIOS_ver" -ForegroundColor 'Green'
+Write-Host "$BIOS_ver" -ForegroundColor 'Cyan'
 Write-Host "OS: " -NoNewline
-Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Green'
+Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Cyan'
 Write-Host "============================"
 Write-Host ""
 
@@ -249,29 +249,34 @@ try {
     Write-Host $_.Exception.Message -ForegroundColor Red
 }
 
-
 # Show device YB
 Write-Host "Checking YB (error status) on DM..." 
-$errorDevices = Get-PnpDevice | Where-Object { $_.Status -eq 'Error' }
-$counter = 1
-$show_YB = $errorDevices | 
-    Select-Object @{Name="No."; Expression={ $script:counter; $script:counter++ }},
-    @{Name="Class"; Expression={ if ($_.Class) { $_.Class } else { "Unknown" } }}, 
-    @{Name="FriendlyName"; Expression={ if ($_.FriendlyName) { $_.FriendlyName } else { if ($_.Name) { $_.Name } else { "Unknown Device" } } }}, 
-    @{Name="InfName"; Expression={
-        try {
-            $inf = Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue
-            if ($inf.Data) { Split-Path $inf.Data -Leaf } else { "N/A" }
-        } catch { "N/A" }
-    }}, 
-    @{Name="HardwareID"; Expression={
-        try {
-            $hwid = Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue
-            if ($hwid.Data -and $hwid.Data.Count -gt 0) { $hwid.Data[0] } else { "N/A" }
-        } catch { "N/A" }
-    }} | Format-Table -AutoSize | Out-String
-Write-Host $show_YB -ForegroundColor 'Yellow'
+$errorDevices = @(Get-PnpDevice | Where-Object { $_.Status -eq 'Error' })
 
+if ($errorDevices.Count -eq 0) {
+    Write-Host "PASSED" -ForegroundColor 'Green'
+	Write-Host ""
+	Write-Host ""
+} else {
+    $counter = 1
+    $show_YB = $errorDevices | 
+        Select-Object @{Name="No."; Expression={ $script:counter; $script:counter++ }},
+        @{Name="Class"; Expression={ if ($_.Class) { $_.Class } else { "Unknown" } }}, 
+        @{Name="FriendlyName"; Expression={ if ($_.FriendlyName) { $_.FriendlyName } else { if ($_.Name) { $_.Name } else { "Unknown Device" } } }}, 
+        @{Name="InfName"; Expression={
+            try {
+                $inf = Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue
+                if ($inf.Data) { Split-Path $inf.Data -Leaf } else { "N/A" }
+            } catch { "N/A" }
+        }}, 
+        @{Name="HardwareID"; Expression={
+            try {
+                $hwid = Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue
+                if ($hwid.Data -and $hwid.Data.Count -gt 0) { $hwid.Data[0] } else { "N/A" }
+            } catch { "N/A" }
+        }} | Format-Table -AutoSize | Out-String
+    Write-Host $show_YB -ForegroundColor 'Yellow'
+}
 
 # Check error event ID 2
 Write-Host "Checking error event ID 2..."
@@ -289,7 +294,7 @@ try {
     Write-Host "    $($event.Message)" -ForegroundColor Red
     #$event | Select-Object TimeCreated, Id, Message | Format-List
 } catch {
-    Write-Host "PASSED"
+    Write-Host "PASSED" -ForegroundColor 'Green'
 }
 Write-Host ""
 Write-Host ""
@@ -323,7 +328,7 @@ if ($bsodFindings.Count -gt 0) {
         Write-Host "  $line" -ForegroundColor Red
     }
 } else {
-    Write-Host "PASSED"
+    Write-Host "PASSED" -ForegroundColor 'Green'
     if (Test-Path -LiteralPath $miniDumpDir -PathType Container) {
         Write-Host "  (Note: $miniDumpDir exists but contains no .dmp files)" -ForegroundColor DarkGray
     }
@@ -546,7 +551,7 @@ if ($infFileFullPath) {
             
             # Display the formatted line
 			$WinPE_info = "qcabd$product_id.sys=<WINSYSDIR>\DriverStore\FileRepository\$directoryName,$hexVersion,$CVA_OS" 
-            Write-Host $WinPE_info -ForegroundColor 'Green'
+            Write-Host $WinPE_info -ForegroundColor 'Blue'
 			
 			$hasWinPEInfo = Test-SectionExists $CVA_filePath "WinPE CVA Information"
 			if (-not $hasWinPEInfo) {
