@@ -703,58 +703,56 @@ if ($sensorList -and $sensorList.Count -gt 0) {
     Write-Host ""
     Write-Host ""
 }
+
 # Extra check for Himax LID service (only for CashmereQ)
 if ($selectedConfigName -eq "CashmereQ") {
-    Write-Host ""
-    Write-Host ""
-    Write-Host "Checking Himax LID Monitor service..."
 
+    Write-Host "Checking Himax Laptop Lid Monitor Service..."
 
-# Check event ID 7045 (Service Control Manager — service installed)
-try {
+    $serviceName = "HmxLaptopLidMonitor"
     $himaxServiceDisplayName = 'Himax Laptop Lid Monitor Service'
-    $filter = @{
-        LogName      = 'System'
-        Id           = 7045
-        Level        = 4   # Information
-        ProviderName = 'Service Control Manager'
-    }
-    $himaxInstallEvent = Get-WinEvent -FilterHashtable $filter -MaxEvents 2000 -ErrorAction Stop |
-        Where-Object {
-            $_.Properties.Count -gt 0 -and
-            $_.Properties[0].Value -eq $himaxServiceDisplayName
-        } |
-        Select-Object -First 1
 
-    if (-not $himaxInstallEvent) {
-        throw 'No matching 7045 event for this service name'
-    }
+    $serviceExists = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 
-    Write-Host "Service was installed" -ForegroundColor Green
-    Write-Host "  TimeCreated: $($himaxInstallEvent.TimeCreated)" 
-    Write-Host "  ID: $($himaxInstallEvent.Id)" 
-    Write-Host "  Message: "
-    Write-Host "    $($himaxInstallEvent.Message)"
-} catch {
-    Write-Host "Service was not installed" -ForegroundColor Red
-}
-
-
-    $exists = Get-Service -Name "HmxLaptopLidMonitor" -ErrorAction SilentlyContinue
-    if ($exists) {
-	$status = $exists.Status
+    if ($serviceExists) {
+        Write-Host "Service is installed" -ForegroundColor Green
+        
+        $status = $serviceExists.Status
         $statusColor = switch ($status) {
-            'Running' { 'Green' }    
-            'Stopped' { 'Red' } 
-             default  { 'Red' }
+            'Running' { 'Green' }
+            'Stopped' { 'Yellow' }
+            default   { 'Red' }
         }
-   	Write-Host "Service status: $status" -ForegroundColor $statusColor
-    } else {
-        Write-Host "Service does not exist" -ForegroundColor Red
-    }
+        Write-Host "Status: " -NoNewline
+		Write-Host "$status" -ForegroundColor $statusColor
 
-    Write-Host ""
-    Write-Host ""
-}
+        # try {
+        #     $filter = @{
+        #         LogName      = 'System'
+        #         Id           = 7045
+        #         Level        = 4   # Information
+        #         ProviderName = 'Service Control Manager'
+        #     }
+        #     $himaxInstallEvent = Get-WinEvent -FilterHashtable $filter -MaxEvents 2000 -ErrorAction SilentlyContinue |
+        #         Where-Object { $_.Properties.Count -gt 0 -and $_.Properties[0].Value -eq $himaxServiceDisplayName } |
+        #         Select-Object -First 1
+
+        #     if ($himaxInstallEvent) {
+        #         Write-Host "  Installation Log Found:" -ForegroundColor Gray
+        #         Write-Host "    TimeCreated: $($himaxInstallEvent.TimeCreated)" -ForegroundColor Gray
+        #         Write-Host "    Message: $($himaxInstallEvent.Message.Trim())" -ForegroundColor Gray
+        #     } else {
+        #         Write-Host "  Installation Log: Event 7045 not found, but service is active." -ForegroundColor Gray
+        #     }
+        # } catch {
+        #     Write-Host "  Installation Log: Unable to query system event logs." -ForegroundColor Gray
+        # }
+
+    } else {
+        Write-Host "Service was not installed or not found!" -ForegroundColor Red
+    }
+	Write-Host ""
+    Write-Host "" 
+} 
 pause
 
