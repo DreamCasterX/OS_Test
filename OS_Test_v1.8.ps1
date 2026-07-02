@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = '1.7'
-$_changedate = 06/30/2026
+$_version = '1.8'
+$_changedate = 07/02/2026
 
 
 # Set-ExecutionPolicy Bypass
@@ -579,6 +579,81 @@ Write-Host ""
 pause
 
 
+# ============================================================================
+# Check Audio System Status & Functionality (ARM64 / Qualcomm Optimized)
+# ============================================================================
+Write-Host ""
+Write-Host ""
+Write-Host "Checking audio service and endpoint..."
+
+# 初始化測試旗標
+$audioPassed = $true
+$failureReasons = @()
+
+# 1. 檢查 Windows 音訊核心服務 (AudioSrv & AudioEndpointBuilder)
+# 只要這兩個服務正常，就代表 Windows 的音訊管理層運作正常
+$audioServices = @("AudioSrv", "AudioEndpointBuilder")
+foreach ($srvName in $audioServices) {
+    $service = Get-Service -Name $srvName -ErrorAction SilentlyContinue
+    if (-not $service -or $service.Status -ne 'Running') {
+        $audioPassed = $false
+        $failureReasons += "Required Audio Service '$srvName' is NOT running."
+    }
+}
+
+# 2. 自動直接將系統 Master 音量設定為 50% 並解除靜音
+if ($audioPassed) {
+    try {
+        # 透過 Windows 內建的音量控制 COM 元件直接調到大約 50%
+        # (透過傳送大量微調或直接指派，這裡使用標準 WScript.Shell 的進階宏定義，連續發送 25 次音量加)
+        $wshShell = New-Object -ComObject WScript.Shell
+        
+        # 先強制發送一次「靜音/切換」確保解除靜音，再連續拉高音量
+        $wshShell.SendKeys([char]174) # Volume Down (喚醒音量條)
+        for ($i = 0; $i -lt 25; $i++) {
+            $wshShell.SendKeys([char]175) # 連續按 25 次音量加 (2% * 25 = 50%)
+        }
+        # Write-Host "-> System volume has been boosted to ~50%." -ForegroundColor Cyan
+    } catch {
+        Write-Host "  Warning: Unable to adjust volume via WScript.Shell macro." -ForegroundColor Yellow
+    }
+}
+
+# ============================================================================
+# 判斷測試結果 Pass / Fail 
+# ============================================================================
+if ($audioPassed) {    
+    # 主動發聲測試
+    Write-Host "-> Playing two alert sounds (Listen for the beep & background)" -ForegroundColor Cyan
+    
+    # 方式 A: 利用系統主頻率發出嗶聲 (500 毫秒)
+    [System.Console]::Beep(800, 500)
+	
+	Start-Sleep -Seconds 0.6
+    
+    # 方式 B: 嘗試播放 Windows 背景音效
+    if (Test-Path "C:\Windows\Media\Windows Background.wav") {
+        try {
+            $player = New-Object System.Media.SoundPlayer("C:\Windows\Media\Windows Background.wav")
+            $player.Play()
+        } catch {
+            Write-Host "  Note: System audio session is active, but WAV playback was skipped." -ForegroundColor Gray
+        }
+    }
+    
+} else {
+    Write-Host "FAILED - Audio issue detected:" -ForegroundColor Red
+    foreach ($reason in $failureReasons) {
+        Write-Host "  - $reason" -ForegroundColor Red
+    }
+}
+
+Write-Host "" 
+Write-Host "" 
+
+pause
+
+
 # Only run sensor tool if sensorList is defined and not empty
 if ($sensorList -and $sensorList.Count -gt 0) {
 
@@ -754,5 +829,6 @@ if ($selectedConfigName -eq "CashmereQ") {
 	Write-Host ""
     Write-Host "" 
 } 
+
 pause
 
