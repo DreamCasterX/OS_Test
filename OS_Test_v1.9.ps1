@@ -1,6 +1,6 @@
 $_creator = "Mike Lu (lu.mike@inventec.com)"
-$_version = '1.8'
-$_changedate = 07/02/2026
+$_version = '1.9'
+$_changedate = 10/13/2026
 
 
 # Set-ExecutionPolicy Bypass
@@ -224,14 +224,14 @@ function Invoke-ChangeAdspPermission {
 
 # Display system info
 $BIOS_ver = (Get-CimInstance -ClassName Win32_BIOS).Name
-$OS_build = (Get-CimInstance -ClassName Win32_OperatingSystem).BuildNumber
-$OS_ver = (Get-CimInstance -ClassName Win32_OperatingSystem).Version
+$cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+$OS_ver = "$($cv.ProductName) $($cv.DisplayVersion) (Build $($cv.CurrentBuild).$($cv.UBR))"
 Write-Host ""
 Write-Host "==== System Information ===="
 Write-Host "BIOS: " -NoNewline
 Write-Host "$BIOS_ver" -ForegroundColor 'Cyan'
 Write-Host "OS: " -NoNewline
-Write-Host "$OS_ver Build $OS_build" -ForegroundColor 'Cyan'
+Write-Host $OS_ver -ForegroundColor 'Cyan'
 Write-Host "============================"
 Write-Host ""
 
